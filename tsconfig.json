@@ -7,7 +7,9 @@
     "strict": true,
     "resolveJsonModule": true,
     "outDir": "dist",
-    "declaration": true
+    "declaration": true,
+    // Skipping lib check because zod is throwing a "Return type annotation circularly references itself." error
+    "skipLibCheck": true
   },
   "include": ["src/**/*"]
 }

@@ -1,6 +1,6 @@
 {
   "name": "@bgschiller/slonik-migrator",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "description": "database migration tool using slonik",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -9,7 +9,8 @@
   ],
   "scripts": {
     "build": "tsc",
-    "test": "vitest"
+    "test": "vitest",
+    "prepack": "npm run build && CI=true npm run test"
   },
   "repository": {
     "type": "git",
