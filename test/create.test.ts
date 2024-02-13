@@ -1,0 +1,75 @@
+import { join } from "path";
+import { range } from "lodash";
+import { SlonikMigrator } from "../src";
+import { fsSyncer } from "fs-syncer";
+import { getPoolHelper } from "./pool-helper";
+import { describe, expect, beforeEach, afterAll, test, vi } from "vitest";
+
+const millisPerDay = 1000 * 60 * 60 * 24;
+const fakeDates = range(0, 100).map((days) =>
+  new Date(new Date("2000").getTime() + days * millisPerDay).toISOString()
+);
+
+const toISOSpy = vi.spyOn(Date.prototype, "toISOString");
+toISOSpy.mockImplementation(() => fakeDates[toISOSpy.mock.calls.length - 1]);
+
+describe("create", async () => {
+  const helper = await getPoolHelper({ __filename });
+
+  const syncer = fsSyncer(join(__dirname, "generated", helper.schemaName), {});
+
+  const migrator = new SlonikMigrator({
+    slonik: helper.pool,
+    migrationsPath: syncer.baseDir,
+    migrationTableName: "migration",
+    logger: undefined,
+  });
+
+  beforeEach(() => {
+    syncer.sync();
+    toISOSpy.mockClear();
+  });
+
+  afterAll(syncer.sync);
+
+  test("creates sql, js and ts files", async () => {
+    await migrator.create({ name: "sql.sql" });
+    await migrator.create({ name: "javascript.js" });
+    await migrator.create({ name: "typescript.ts" });
+
+    await expect(migrator.create({ name: "text.txt" })).rejects.toThrowError(
+      /Extension .txt not allowed./
+    );
+
+    expect(syncer.read()).toMatchInlineSnapshot(`
+      {
+        "2000.01.01T00.00.00.sql.sql": "raise 'up migration not implemented'
+      ",
+        "2000.01.02T00.00.00.javascript.js": "/** @type {import('@slonik/migrator').Migration} */
+      exports.up = async ({context: {connection, sql}}) => {
+        await connection.query(sql.unknown\`raise 'up migration not implemented'\`)
+      }
+
+      /** @type {import('@slonik/migrator').Migration} */
+      exports.down = async ({context: {connection, sql}}) => {
+        await connection.query(sql.unknown\`raise 'down migration not implemented'\`)
+      }
+      ",
+        "2000.01.03T00.00.00.typescript.ts": "import {Migration} from '@slonik/migrator'
+
+      export const up: Migration = async ({context: {connection, sql}}) => {
+        await connection.query(sql.unknown\`raise 'up migration not implemented'\`)
+      }
+
+      export const down: Migration = async ({context: {connection, sql}}) => {
+        await connection.query(sql.unknown\`raise 'down migration not implemented'\`)
+      }
+      ",
+        "down": {
+          "2000.01.01T00.00.00.sql.sql": "raise 'down migration not implemented'
+      ",
+        },
+      }
+    `);
+  });
+});
